@@ -679,7 +679,7 @@ static void RunPayrollTest(DatabaseHelper dbHelper)
             Console.WriteLine("Invalid input. Please enter a valid non-negative decimal amount.");
         }
 
-        PayrollRecord record = CalculatePayroll(employee, otherDeductions, payMonth, payYear);
+        PayrollRecord record = PayrollCalculator.CalculatePayroll(employee, otherDeductions, payMonth, payYear);
 
         Console.WriteLine("\n--- Payroll Results ---");
         Console.WriteLine($"Employee: {employee.FirstName} {employee.LastName}");
@@ -722,74 +722,6 @@ foreach (Employee employee in databaseEmployees)
 {
     Console.WriteLine($"Loaded ID: {employee.Id}");
 }
-
-
-
-static PayrollRecord CalculatePayroll(Employee? employee, decimal otherDeductions, int payMonth, int payYear)
-{
-
-    if (employee == null)
-    {
-        throw new ArgumentNullException(nameof(employee), "Employee cannot be null.");
-    }
-
-    if (!employee.DateOfBirth.HasValue)
-    {
-        throw new InvalidOperationException("Employee Date of Birth is required for tax rebate calculations.");
-    }
-
-    if (otherDeductions < 0m)
-    {
-        throw new ArgumentOutOfRangeException(nameof(otherDeductions), "Deductions cannot be negative.");
-    }
-
-    if (payMonth < 1 || payMonth > 12)
-    {
-        throw new ArgumentOutOfRangeException(nameof(payMonth), "Pay month must be between 1 and 12.");
-    }
-
-    if (payYear < 2026)
-    {
-        throw new ArgumentOutOfRangeException(nameof(payYear), "Pay year must be 2026 or later.");
-    }
-
-    if (employee.Salary <= 0m)
-    {
-        throw new ArgumentOutOfRangeException(nameof(employee.Salary), "Salary cannot be negative or eqaute to zero");
-    }
-
-    decimal grossPay = employee.Salary;
-
-    // 1. Determine the tax year end based on the pay month and year
-    DateTime taxYearEnd = Employee.GetTaxYearEnd(payMonth, payYear);
-
-    // 2. Calculate the employee's age as of that tax year end date
-    int? age = employee.GetAge(taxYearEnd);
-
-    decimal paye = employee.CalculateMonthlyPAYE(employee.Salary, age);
-    decimal uif = Math.Round(Math.Min(employee.Salary, 17712m) * 0.01m, 2);
-    decimal netPay = grossPay - otherDeductions - paye - uif;
-
-    if (netPay < 0m)
-    {
-        throw new InvalidOperationException("Net pay cannot be negative. Other deductions exceed available earnings.");
-    }
-
-
-    return new PayrollRecord
-    {
-        EmployeeId = employee.Id,
-        PayMonth = payMonth,
-        PayYear = payYear,
-        GrossPay = grossPay,
-        OtherDeductions = otherDeductions,
-        PAYE = paye,
-        UIF = uif,
-        NetPay = netPay,
-        ProcessedAt = DateTime.Now
-    };
-}
-
 
 
 
@@ -861,7 +793,7 @@ static void ProcessPayrollMenu(DatabaseHelper dbHelper)
         try
         {
             // 1. Calculate payroll (will catch out-of-range deductions here too)
-            PayrollRecord record = CalculatePayroll(employee, otherDeductions, payMonth, payYear);
+            PayrollRecord record = PayrollCalculator.CalculatePayroll(employee, otherDeductions, payMonth, payYear);
 
             // 2. Save to database using dbHelper
             bool isSaved = dbHelper.SavePayrollRecord(record);
