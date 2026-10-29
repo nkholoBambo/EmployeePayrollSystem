@@ -1,15 +1,68 @@
-# C# Employee Payroll System
+C# Employee Payroll System
 
-A robust, console-based Employee Management and Payroll System built in C# and connected to a Microsoft SQL Server database using ADO.NET. Designed with a focus on defensive programming, data integrity, and South African tax compliance.
+A robust Employee Management and Payroll System built in C# and connected to a Microsoft SQL Server database using ADO.NET. It started as a console application and now also exposes an ASP.NET Core Web API, with both sharing the same payroll logic. Designed with a focus on defensive programming, data integrity, and South African tax compliance.
 
-## Features
-- **Employee CRUD Operations:** Add, view, update, and delete employees with local state staging and confirmation workflows.
-- **Automated Payroll Processing:** Calculates South African statutory deductions including PAYE (using tax brackets and age-based rebates), UIF (with statutory caps), and net pay.
-- **Database Integrity:** Enforces unique constraints at the SQL Server level to prevent duplicate payroll processing for the same employee and tax period.
-- **Payroll History:** Queries and displays past payroll records formatted in South African Rands (`en-ZA`).
-- **Robust Error Handling:** Comprehensive exception management for database connectivity, constraints, and user input validation.
+Solution structure
+Project	                    Type	                Purpose
+Payroll.Core	            Class library	        Shared models (Employee, PayrollRecord, Departments), the DatabaseHelper data layer, and the PayrollCalculator
+Payroll.ConsoleApp	        Console app	            The original menu-driven application
+Payroll.Api	                ASP.NET Core Web API	REST endpoints for employees and a payslip preview
 
-## Tech Stack
-- **Language:** C# (.NET / Object-Oriented Programming)
-- **Database:** Microsoft SQL Server (MSSQL), ADO.NET (`SqlConnection`, `SqlCommand`, `SqlDataReader`)
-- **Environment:** Visual Studio Code / .NET CLI
+Payroll rules live in one place (Payroll.Core), so the console app and the API always calculate the same way.
+
+Features:
+-Employee CRUD Operations: Add, view, update, and delete employees with local state staging and confirmation workflows (console), or through REST endpoints (API).
+-Automated Payroll Processing: Calculates South African statutory deductions including PAYE (using tax brackets and age-based rebates), UIF (with statutory caps), and net pay.
+-Payslip Preview API: Calculates a payslip for any employee and pay period over HTTP without saving anything.
+-Database Integrity: Enforces unique constraints at the SQL Server level to prevent duplicate payroll processing for the same employee and tax period.
+-Payroll History: Queries and displays past payroll records formatted in South African Rands (en-ZA).
+-Robust Error Handling: Comprehensive exception management for database connectivity, constraints, and user input validation. The API maps failures to meaningful HTTP status codes.
+
+API endpoints:
+Method	  Route	                                                    Purpose	Status codes
+GET	      /api/employees	                                        List all employees	200
+GET	      /api/employees/{id}	                                    Get one employee	200, 404
+POST	  /api/employees	                                        Create an employee	201, 409 (Id already exists)
+PUT	      /api/employees/{id}	                                    Update an employee	204, 400 (Id mismatch), 404
+DELETE	  /api/employees/{id}	                                    Delete an employee	204, 404
+GET	      /api/payroll/{employeeId}?month=&year=&otherDeductions=	Preview a payslip (nothing is saved)	200, 400, 404
+
+Department is sent and received as its name rather than a number. Interactive documentation and a test console are available at /scalar/v1 while the API is running in Development.
+
+Tax rules and limitations:
+-Tax year: the tables are for the 2026/27 South African tax year (1 March 2026 to 28 February 2027). Payroll can only be processed for pay periods from March 2026 to February 2027, and anything outside that range is rejected.
+-PAYE: annual tax from the 2026/27 brackets, minus the primary, secondary (65+) or tertiary (75+) rebate based on the employee's age at the end of the tax year, divided by 12. A date of birth is required.
+-UIF: 1% of salary, capped at the R17,712 monthly earnings ceiling (a maximum of R177.12 per month). The employer's matching contribution is not modelled.
+-Simplified model: medical aid credits, retirement fund deductions, bonuses and overtime are not handled.
+
+Tech Stack:
+-Language: C# on .NET 10 (Object-Oriented Programming)
+-API: ASP.NET Core Web API (controllers), OpenAPI with Scalar for documentation and testing
+-Database: Microsoft SQL Server (MSSQL), ADO.NET (SqlConnection, SqlCommand, SqlDataReader)
+-Environment: Visual Studio Code / .NET CLI
+
+Getting started:
+-Prerequisites: the .NET 10 SDK and SQL Server (Express is fine).
+
+1. Create the database. Create a database named EmployeeManagementDB, then run database/schema.sql against it to create the tables and constraints.
+2. Console app: in Payroll.ConsoleApp/Program.cs, set the Server= part of the connection string to your own SQL Server instance, then run:
+   dotnet run --project Payroll.ConsoleApp
+3. API: create Payroll.Api/appsettings.Development.json (it is git-ignored, so your machine name stays off GitHub):
+json
+   {
+     "ConnectionStrings": {
+       "PayrollDb": "Server=YOUR_SERVER_NAME\\SQLEXPRESS;Database=EmployeeManagementDB;Integrated Security=True;TrustServerCertificate=True;"
+     }
+   }
+
+Then run:
+
+   dotnet run --project Payroll.Api
+
+The terminal prints the address it is listening on. Open that address with /scalar/v1 added to try the endpoints.
+
+Known limitations and next steps:
+-Employee Ids are supplied by the caller rather than generated by the database. The API refuses duplicates with a 409.
+-The API previews payroll but does not yet save a payroll run. That would be a separate POST endpoint.
+-There is no authentication, so the API should not be exposed publicly.
+-There are no automated tests yet. The payroll calculator is a good first candidate.

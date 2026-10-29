@@ -698,8 +698,7 @@ static void RunPayrollTest(DatabaseHelper dbHelper)
     }
 }
 
-
-string connectionString = @"Server=DESKTOP-GT5UN44\SQLEXPRESS;Database=EmployeeManagementDB;Integrated Security=True;TrustServerCertificate=True;";
+string connectionString = Environment.GetEnvironmentVariable("PAYROLL_DB") ?? "Server=YOUR_SERVER_NAME\\SQLEXPRESS;Database=EmployeeManagementDB;Integrated Security=True;TrustServerCertificate=True;";
 
 DatabaseHelper dbHelper = new DatabaseHelper(connectionString);
 
