@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 
 namespace Payroll.Api.Controllers;
 
@@ -78,9 +79,16 @@ public class EmployeesController : ControllerBase
             return NotFound();
         }
 
-        if (!_db.DeleteEmployee(id))
+        try
         {
-            return StatusCode(500, "The employee could not be deleted.");
+            if (!_db.DeleteEmployee(id))
+            {
+                return StatusCode(500, "The employee could not be deleted.");
+            }
+        }
+        catch (SqlException ex) when (ex.Number == 547)
+        {
+            return Conflict("This employee has payroll records and cannot be deleted.");
         }
 
         return NoContent();
