@@ -22,14 +22,15 @@ public static class PayrollCalculator
             throw new ArgumentOutOfRangeException(nameof(payMonth), "Pay month must be between 1 and 12.");
         }
 
-        if (payYear < 2026)
+        int payPeriod = payYear * 100 + payMonth;
+        if (payPeriod < 202603 || payPeriod > 202702)
         {
-            throw new ArgumentOutOfRangeException(nameof(payYear), "Pay year must be 2026 or later.");
+            throw new ArgumentOutOfRangeException(nameof(payMonth), "Payroll can only be processed from March 2026 to February 2027, because the tax tables in this system are for the 2026/27 tax year.");
         }
 
         if (employee.Salary <= 0m)
         {
-            throw new ArgumentOutOfRangeException(nameof(employee.Salary), "Salary cannot be negative or eqaute to zero");
+            throw new ArgumentOutOfRangeException(nameof(employee.Salary), "Salary must be greater than zero.");
         }
 
         decimal grossPay = employee.Salary;
