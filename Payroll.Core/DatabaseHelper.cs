@@ -147,7 +147,12 @@ public class DatabaseHelper
         command.Parameters.AddWithValue("@Email", employee.Email);
         command.Parameters.AddWithValue("@Department", employee.Department.ToString());
         command.Parameters.AddWithValue("@Position", employee.Position);
-        command.Parameters.AddWithValue("@Salary", employee.Salary);
+        command.Parameters.Add(new SqlParameter("@Salary", SqlDbType.Decimal)
+        {
+            Precision = 12,
+            Scale = 2,
+            Value = employee.Salary
+        });
         command.Parameters.AddWithValue("@HireDate", employee.HireDate);
         command.Parameters.AddWithValue("@DateOfBirth", employee.DateOfBirth ?? (object)DBNull.Value);
 
@@ -170,7 +175,12 @@ public class DatabaseHelper
         command.Parameters.AddWithValue("@Email", employee.Email);
         command.Parameters.AddWithValue("@Department", employee.Department.ToString());
         command.Parameters.AddWithValue("@Position", employee.Position);
-        command.Parameters.AddWithValue("@Salary", employee.Salary);
+        command.Parameters.Add(new SqlParameter("@Salary", SqlDbType.Decimal)
+        {
+            Precision = 12,
+            Scale = 2,
+            Value = employee.Salary
+        });
         command.Parameters.AddWithValue("@HireDate", employee.HireDate);
         command.Parameters.AddWithValue("@DateOfBirth", (object?)employee.DateOfBirth ?? DBNull.Value);
 

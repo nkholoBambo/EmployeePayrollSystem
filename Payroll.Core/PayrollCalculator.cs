@@ -1,5 +1,9 @@
 public static class PayrollCalculator
 {
+
+    private const decimal UifMonthlyCeiling = 17712m;
+    private const decimal UifRate = 0.01m;
+
     public static PayrollRecord CalculatePayroll(Employee? employee, decimal otherDeductions, int payMonth, int payYear)
     {
         if (employee == null)
@@ -35,11 +39,13 @@ public static class PayrollCalculator
 
         decimal grossPay = employee.Salary;
 
+
         DateTime taxYearEnd = Employee.GetTaxYearEnd(payMonth, payYear);
         int? age = employee.GetAge(taxYearEnd);
 
         decimal paye = employee.CalculateMonthlyPAYE(employee.Salary, age);
-        decimal uif = Math.Round(Math.Min(employee.Salary, 17712m) * 0.01m, 2);
+        decimal uif = Math.Round(Math.Min(employee.Salary, UifMonthlyCeiling) * UifRate, 2, MidpointRounding.AwayFromZero);
+
         decimal netPay = grossPay - otherDeductions - paye - uif;
 
         if (netPay < 0m)
