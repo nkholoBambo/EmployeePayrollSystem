@@ -5,10 +5,11 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("PayrollDb")
     ?? throw new InvalidOperationException("Connection string 'PayrollDb' not found.");
 
-builder.Services.AddScoped(_ => new DatabaseHelper(connectionString));
+builder.Services.AddScoped<IEmployeeRepository>(_ => new DatabaseHelper(connectionString));
+builder.Services.AddScoped<IPayrollRepository>(_ => new DatabaseHelper(connectionString));
 
 // Add services to the container.
-
+builder.Services.AddProblemDetails();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -16,6 +17,7 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

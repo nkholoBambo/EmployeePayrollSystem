@@ -6,9 +6,9 @@ namespace Payroll.Api.Controllers;
 [Route("api/[controller]")]
 public class PayrollController : ControllerBase
 {
-    private readonly DatabaseHelper _db;
+    private readonly IEmployeeRepository _db;
 
-    public PayrollController(DatabaseHelper db)
+    public PayrollController(IEmployeeRepository db)
     {
         _db = db;
     }

@@ -2,7 +2,7 @@ using System;
 using Microsoft.Data.SqlClient;
 using System.Data;
 
-public class DatabaseHelper
+public class DatabaseHelper : IEmployeeRepository, IPayrollRepository
 {
     private readonly string _connectionString;
 

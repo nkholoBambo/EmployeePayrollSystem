@@ -7,13 +7,14 @@ namespace Payroll.Api.Controllers;
 [Route("api/[controller]")]
 public class EmployeesController : ControllerBase
 {
-    private readonly DatabaseHelper _db;
+    private readonly IEmployeeRepository _db;
 
-    public EmployeesController(DatabaseHelper db)
+    public EmployeesController(IEmployeeRepository db)
     {
         _db = db;
     }
 
+    
     [HttpGet]
     public ActionResult<List<Employee>> GetAll()
     {
