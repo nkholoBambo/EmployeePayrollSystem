@@ -2,6 +2,7 @@ namespace Payroll.Web.Models;
 
 public class PayslipPreview
 {
+    public int Id { get; set; }
     public int EmployeeId { get; set; }
     public int PayMonth { get; set; }
     public int PayYear { get; set; }

@@ -70,6 +70,24 @@ else
                 <tr class="table-active"><th>Net pay</th><td class="text-end fw-bold">R @payslip.NetPay.ToString("N2")</td></tr>
             </tbody>
         </table>
+
+        @if (isSaved)
+        {
+            <div class="alert alert-success">@saveMessage</div>
+        }
+        else
+        {
+            @if (saveMessage is not null)
+            {
+                <div class="alert alert-warning">@saveMessage</div>
+            }
+
+            <p class="text-muted">Saving records this payslip permanently for this employee and month.</p>
+
+            <button class="btn btn-success" @onclick="SaveAsync" disabled="@isSaving">
+                @(isSaving ? "Saving..." : "Save payslip")
+            </button>
+        }
     }
 }
 
@@ -85,6 +103,17 @@ else
     private string? payslipTitle;
     private string? errorMessage;
     private bool isBusy;
+
+    // The values that were actually previewed. Save uses these, not the dropdowns,
+    // so what gets saved is always exactly what the user saw.
+    private int previewEmployeeId;
+    private int previewMonth;
+    private int previewYear;
+    private decimal previewDeductions;
+
+    private bool isSaving;
+    private bool isSaved;
+    private string? saveMessage;
 
     // The API only accepts the 2026/27 tax year (March 2026 to February 2027).
     // The API stays the authority; this list just stops users picking invalid months.
@@ -121,6 +150,8 @@ else
     {
         errorMessage = null;
         payslip = null;
+        saveMessage = null;
+        isSaved = false;
 
         if (selectedEmployeeId == 0)
         {
@@ -151,6 +182,12 @@ else
             {
                 payslip = await response.Content.ReadFromJsonAsync<PayslipPreview>();
 
+                // Remember exactly what was previewed, for the Save button.
+                previewEmployeeId = selectedEmployeeId;
+                previewMonth = month;
+                previewYear = year;
+                previewDeductions = otherDeductions;
+
                 var employee = employees!.First(e => e.Id == selectedEmployeeId);
                 var periodLabel = periods.First(p => p.Value == selectedPeriod).Label;
                 payslipTitle = $"{employee.FirstName} {employee.LastName}, {periodLabel}";
@@ -179,6 +216,59 @@ else
         finally
         {
             isBusy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saveMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var request = new
+            {
+                employeeId = previewEmployeeId,
+                month = previewMonth,
+                year = previewYear,
+                otherDeductions = previewDeductions
+            };
+
+            var response = await Http.PostAsJsonAsync("api/payroll", request);
+
+            if (response.IsSuccessStatusCode)          // 201 Created
+            {
+                var saved = await response.Content.ReadFromJsonAsync<PayslipPreview>();
+                saveMessage = $"Payslip saved (record {saved?.Id}).";
+                isSaved = true;
+            }
+            else if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                saveMessage = "This employee already has a payslip for that month. Choose a different month to save another.";
+            }
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                saveMessage = "That employee no longer exists.";
+            }
+            else if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                saveMessage = body.TrimStart().StartsWith("{")
+                    ? "The payslip could not be saved. Please check the details and try again."
+                    : body;
+            }
+            else
+            {
+                saveMessage = $"Something went wrong ({(int)response.StatusCode}). Please try again.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            saveMessage = "Could not reach the payroll API. Is it running?";
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 }
