@@ -1,0 +1,154 @@
+@page "/employees/new"
+@using System.Net
+@using Payroll.Web.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Add employee</PageTitle>
+
+<h1>Add employee</h1>
+
+@if (serverErrors.Count > 0)
+{
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            @foreach (var error in serverErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+@if (departments is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="form" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label class="form-label">First name</label>
+            <InputText class="form-control" @bind-Value="form.FirstName" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Last name</label>
+            <InputText class="form-control" @bind-Value="form.LastName" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <InputText class="form-control" @bind-Value="form.Email" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Department</label>
+            <InputSelect class="form-select" @bind-Value="form.Department">
+                <option value="">-- choose --</option>
+                @foreach (var department in departments)
+                {
+                    <option value="@department">@department</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Position</label>
+            <InputText class="form-control" @bind-Value="form.Position" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Monthly salary (R)</label>
+            <InputNumber class="form-control" @bind-Value="form.Salary" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Hire date</label>
+            <InputDate class="form-control" @bind-Value="form.HireDate" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Date of birth</label>
+            <InputDate class="form-control" @bind-Value="form.DateOfBirth" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+            @(isSaving ? "Saving..." : "Save")
+        </button>
+        <a class="btn btn-link" href="employees">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    private readonly NewEmployeeForm form = new() { HireDate = DateTime.Today };
+    private readonly List<string> serverErrors = new();
+    private string[]? departments;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            departments = await Http.GetFromJsonAsync<string[]>("api/departments");
+        }
+        catch (HttpRequestException)
+        {
+            serverErrors.Add("Could not reach the payroll API. Is it running?");
+            departments = Array.Empty<string>();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        serverErrors.Clear();
+
+        if (form.DateOfBirth > DateTime.Today)
+        {
+            serverErrors.Add("Date of birth cannot be in the future.");
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/employees", form);
+
+            if (response.IsSuccessStatusCode)          // 201 Created
+            {
+                Navigation.NavigateTo("employees");
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var problem = await response.Content.ReadFromJsonAsync<ApiValidationProblem>();
+
+                if (problem?.Errors is { Count: > 0 })
+                {
+                    serverErrors.AddRange(problem.Errors.SelectMany(e => e.Value));
+                }
+                else
+                {
+                    serverErrors.Add("The API rejected the employee details.");
+                }
+            }
+            else
+            {
+                serverErrors.Add($"Something went wrong ({(int)response.StatusCode}). Please try again.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            serverErrors.Add("Could not reach the payroll API. Is it running?");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

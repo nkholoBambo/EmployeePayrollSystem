@@ -783,24 +783,27 @@ static void ProcessPayrollMenu(DatabaseHelper dbHelper)
             // 1. Calculate payroll (will catch out-of-range deductions here too)
             PayrollRecord record = PayrollCalculator.CalculatePayroll(employee, otherDeductions, payMonth, payYear);
 
-            // 2. Save to database using dbHelper
-            bool isSaved = dbHelper.SavePayrollRecord(record);
+            // 2. Save to database. Returns the new record's Id and throws if the save fails.
+            record.Id = dbHelper.SavePayrollRecord(record);
 
-            if (isSaved)
-            {
-                Console.WriteLine($"\nPayroll successfully processed and saved for {employee.FirstName} {employee.LastName}!");
-                Console.WriteLine($"Gross Pay: {record.GrossPay:C} | Net Pay: {record.NetPay:C}");
+            Console.WriteLine($"\nPayroll successfully processed and saved for {employee.FirstName} {employee.LastName}! (Record {record.Id})");
+            Console.WriteLine($"Gross Pay: {record.GrossPay:C} | Net Pay: {record.NetPay:C}");
 
-                Console.WriteLine("\nPress any key to return to the Main Menu...");
-                Console.ReadKey();
-                return; // Success! Now we can exit back to the main menu.
-            }
-            else
-            {
-                Console.WriteLine("\nFailed to save payroll record to the database.");
-                Console.WriteLine("Press any key to try again...");
-                Console.ReadKey();
-            }
+            Console.WriteLine("\nPress any key to return to the Main Menu...");
+            Console.ReadKey();
+            return; // Success! Now we can exit back to the main menu.
+        }
+        catch (SqlException ex) when (ex.Number is 2627 or 2601)
+        {
+            Console.WriteLine("\nPayroll for this employee and period has already been processed.");
+            Console.WriteLine("Press any key to try again...");
+            Console.ReadKey();
+        }
+        catch (SqlException ex)
+        {
+            Console.WriteLine($"\nDatabase error: {ex.Message}");
+            Console.WriteLine("Press any key to try again...");
+            Console.ReadKey();
         }
         catch (Exception ex)
         {

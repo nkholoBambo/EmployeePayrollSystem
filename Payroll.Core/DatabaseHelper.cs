@@ -200,107 +200,83 @@ public class DatabaseHelper : IEmployeeRepository, IPayrollRepository
         return rowsAffected == 1;
     }
 
-
-    public bool SavePayrollRecord(PayrollRecord record)
+    public int SavePayrollRecord(PayrollRecord record)
     {
-        using (SqlConnection connection = new SqlConnection(_connectionString))
-        {
-            string query = @"INSERT INTO PayrollRecords 
-                     (EmployeeId, PayMonth, PayYear, GrossPay, OtherDeductions, PAYE, UIF, NetPay, ProcessedAt) 
-                     VALUES 
-                     (@EmployeeId, @PayMonth, @PayYear, @GrossPay, @OtherDeductions, @PAYE, @UIF, @NetPay, @ProcessedAt)";
+        using var connection = new SqlConnection(_connectionString);
+        connection.Open();
 
-            using (SqlCommand command = new SqlCommand(query, connection))
-            {
-                // 1. Explicit integer parameters
-                command.Parameters.Add("@EmployeeId", SqlDbType.Int).Value = record.EmployeeId;
-                command.Parameters.Add("@PayMonth", SqlDbType.Int).Value = record.PayMonth;
-                command.Parameters.Add("@PayYear", SqlDbType.Int).Value = record.PayYear;
+        const string query = @"INSERT INTO PayrollRecords
+        (EmployeeId, PayMonth, PayYear, GrossPay, OtherDeductions, PAYE, UIF, NetPay, ProcessedAt)
+        OUTPUT INSERTED.Id
+        VALUES
+        (@EmployeeId, @PayMonth, @PayYear, @GrossPay, @OtherDeductions, @PAYE, @UIF, @NetPay, @ProcessedAt)";
 
-                // 2. Explicit decimal/money parameters with precision and scale matching DECIMAL(12, 2)
-                command.Parameters.Add(new SqlParameter("@GrossPay", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.GrossPay });
-                command.Parameters.Add(new SqlParameter("@OtherDeductions", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.OtherDeductions });
-                command.Parameters.Add(new SqlParameter("@PAYE", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.PAYE });
-                command.Parameters.Add(new SqlParameter("@UIF", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.UIF });
-                command.Parameters.Add(new SqlParameter("@NetPay", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.NetPay });
+        using var command = new SqlCommand(query, connection);
 
-                // 3. Explicit datetime parameter
-                command.Parameters.Add("@ProcessedAt", SqlDbType.DateTime2).Value = record.ProcessedAt;
+        command.Parameters.Add("@EmployeeId", SqlDbType.Int).Value = record.EmployeeId;
+        command.Parameters.Add("@PayMonth", SqlDbType.Int).Value = record.PayMonth;
+        command.Parameters.Add("@PayYear", SqlDbType.Int).Value = record.PayYear;
 
-                try
-                {
-                    connection.Open();
-                    int rowsAffected = command.ExecuteNonQuery();
-                    return rowsAffected > 0;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-            }
-        }
+        command.Parameters.Add(new SqlParameter("@GrossPay", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.GrossPay });
+        command.Parameters.Add(new SqlParameter("@OtherDeductions", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.OtherDeductions });
+        command.Parameters.Add(new SqlParameter("@PAYE", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.PAYE });
+        command.Parameters.Add(new SqlParameter("@UIF", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.UIF });
+        command.Parameters.Add(new SqlParameter("@NetPay", SqlDbType.Decimal) { Precision = 12, Scale = 2, Value = record.NetPay });
+
+        command.Parameters.Add("@ProcessedAt", SqlDbType.DateTime2).Value = record.ProcessedAt;
+
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 
     public bool PayrollExists(int employeeId, int payMonth, int payYear)
     {
-        using (SqlConnection conn = new SqlConnection(_connectionString))
-        {
-            string query = "SELECT COUNT(1) FROM PayrollRecords WHERE EmployeeId = @EmployeeId AND PayMonth = @PayMonth AND PayYear = @PayYear";
+        using var connection = new SqlConnection(_connectionString);
+        connection.Open();
 
-            using (SqlCommand cmd = new SqlCommand(query, conn))
-            {
-                cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
-                cmd.Parameters.AddWithValue("@PayMonth", payMonth);
-                cmd.Parameters.AddWithValue("@PayYear", payYear);
+        using var command = new SqlCommand(
+            "SELECT COUNT(1) FROM PayrollRecords WHERE EmployeeId = @EmployeeId AND PayMonth = @PayMonth AND PayYear = @PayYear",
+            connection);
 
-                conn.Open();
-                int count = (int)cmd.ExecuteScalar();
-                return count > 0;
-            }
-        }
+        command.Parameters.Add("@EmployeeId", SqlDbType.Int).Value = employeeId;
+        command.Parameters.Add("@PayMonth", SqlDbType.Int).Value = payMonth;
+        command.Parameters.Add("@PayYear", SqlDbType.Int).Value = payYear;
+
+        return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
-
 
     public List<PayrollRecord> GetAllPayrollRecords()
     {
-        // 1. Create an empty list to hold the records
-        List<PayrollRecord> recordsList = new List<PayrollRecord>();
+        var records = new List<PayrollRecord>();
 
-        string query = "SELECT * FROM PayrollRecords";
+        using var connection = new SqlConnection(_connectionString);
+        connection.Open();
 
-        // 2. Pass your connection string into SqlConnection
-        using (SqlConnection connection = new SqlConnection(_connectionString))
+        using var command = new SqlCommand(
+            "SELECT Id, EmployeeId, PayMonth, PayYear, GrossPay, OtherDeductions, PAYE, UIF, NetPay, ProcessedAt " +
+            "FROM PayrollRecords ORDER BY ProcessedAt DESC",
+            connection);
+
+        using var reader = command.ExecuteReader();
+
+        while (reader.Read())
         {
-            using (SqlCommand command = new SqlCommand(query, connection))
+            records.Add(new PayrollRecord
             {
-                connection.Open();
-
-                // 3. Capture the reader returned by ExecuteReader()
-                using (SqlDataReader reader = command.ExecuteReader())
-                {
-                    // 4. Loop through each row
-                    while (reader.Read())
-                    {
-                        // 5. Instantiate a new PayrollRecord and map the columns here:
-                        PayrollRecord record = new PayrollRecord();
-                        record.Id = reader.GetInt32(reader.GetOrdinal("Id"));
-                        record.EmployeeId = reader.GetInt32(reader.GetOrdinal("EmployeeId"));
-                        record.PayMonth = reader.GetInt32(reader.GetOrdinal("PayMonth"));
-                        record.PayYear = reader.GetInt32(reader.GetOrdinal("PayYear"));
-                        record.GrossPay = reader.GetDecimal(reader.GetOrdinal("GrossPay"));
-                        record.OtherDeductions = reader.GetDecimal(reader.GetOrdinal("OtherDeductions"));
-                        record.PAYE = reader.GetDecimal(reader.GetOrdinal("PAYE"));
-                        record.UIF = reader.GetDecimal(reader.GetOrdinal("UIF"));
-                        record.NetPay = reader.GetDecimal(reader.GetOrdinal("NetPay"));
-                        record.ProcessedAt = reader.GetDateTime(reader.GetOrdinal("ProcessedAt"));
-                        // 6. Add the populated record to your list
-                        recordsList.Add(record);
-                    }
-                }
-            }
+                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                EmployeeId = reader.GetInt32(reader.GetOrdinal("EmployeeId")),
+                PayMonth = reader.GetInt32(reader.GetOrdinal("PayMonth")),
+                PayYear = reader.GetInt32(reader.GetOrdinal("PayYear")),
+                GrossPay = reader.GetDecimal(reader.GetOrdinal("GrossPay")),
+                OtherDeductions = reader.GetDecimal(reader.GetOrdinal("OtherDeductions")),
+                PAYE = reader.GetDecimal(reader.GetOrdinal("PAYE")),
+                UIF = reader.GetDecimal(reader.GetOrdinal("UIF")),
+                NetPay = reader.GetDecimal(reader.GetOrdinal("NetPay")),
+                ProcessedAt = reader.GetDateTime(reader.GetOrdinal("ProcessedAt"))
+            });
         }
 
-        // 7. Return the completed list
-        return recordsList;
+        return records;
     }
+
+
 }
