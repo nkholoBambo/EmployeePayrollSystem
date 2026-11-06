@@ -1,0 +1,184 @@
+@page "/payslip"
+@using System.Globalization
+@using System.Net
+@using Payroll.Web.Models
+@inject HttpClient Http
+
+<PageTitle>Payslip preview</PageTitle>
+
+<h1>Payslip preview</h1>
+
+@if (loadError is not null)
+{
+    <div class="alert alert-danger">@loadError</div>
+}
+else if (employees is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label">Employee</label>
+            <select class="form-select" @bind="selectedEmployeeId">
+                <option value="0">-- choose --</option>
+                @foreach (var employee in employees)
+                {
+                    <option value="@employee.Id">@employee.FirstName @employee.LastName (@employee.Id)</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Pay period</label>
+            <select class="form-select" @bind="selectedPeriod">
+                @foreach (var period in periods)
+                {
+                    <option value="@period.Value">@period.Label</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Other deductions (R)</label>
+            <input type="number" class="form-control" min="0" step="0.01" @bind="otherDeductions" />
+        </div>
+
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary w-100" @onclick="CalculateAsync" disabled="@isBusy">
+                @(isBusy ? "Working..." : "Calculate")
+            </button>
+        </div>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (payslip is not null)
+    {
+        <h2 class="h4">@payslipTitle</h2>
+
+        <table class="table w-auto">
+            <tbody>
+                <tr><th>Gross pay</th><td class="text-end">R @payslip.GrossPay.ToString("N2")</td></tr>
+                <tr><th>PAYE</th><td class="text-end">- R @payslip.PAYE.ToString("N2")</td></tr>
+                <tr><th>UIF</th><td class="text-end">- R @payslip.UIF.ToString("N2")</td></tr>
+                <tr><th>Other deductions</th><td class="text-end">- R @payslip.OtherDeductions.ToString("N2")</td></tr>
+                <tr class="table-active"><th>Net pay</th><td class="text-end fw-bold">R @payslip.NetPay.ToString("N2")</td></tr>
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private List<Employee>? employees;
+    private string? loadError;
+
+    private int selectedEmployeeId;
+    private string selectedPeriod = "2026-03";
+    private decimal otherDeductions;
+
+    private PayslipPreview? payslip;
+    private string? payslipTitle;
+    private string? errorMessage;
+    private bool isBusy;
+
+    // The API only accepts the 2026/27 tax year (March 2026 to February 2027).
+    // The API stays the authority; this list just stops users picking invalid months.
+    private static readonly List<(string Value, string Label)> periods = BuildPeriods();
+
+    private static List<(string Value, string Label)> BuildPeriods()
+    {
+        var list = new List<(string Value, string Label)>();
+        var start = new DateTime(2026, 3, 1);
+
+        for (int i = 0; i < 12; i++)
+        {
+            var month = start.AddMonths(i);
+            list.Add((month.ToString("yyyy-MM", CultureInfo.InvariantCulture),
+                      month.ToString("MMMM yyyy", CultureInfo.InvariantCulture)));
+        }
+
+        return list;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            employees = await Http.GetFromJsonAsync<List<Employee>>("api/employees");
+        }
+        catch (HttpRequestException)
+        {
+            loadError = "Could not reach the payroll API. Is it running?";
+        }
+    }
+
+    private async Task CalculateAsync()
+    {
+        errorMessage = null;
+        payslip = null;
+
+        if (selectedEmployeeId == 0)
+        {
+            errorMessage = "Please choose an employee.";
+            return;
+        }
+
+        if (otherDeductions < 0)
+        {
+            errorMessage = "Other deductions cannot be negative.";
+            return;
+        }
+
+        var parts = selectedPeriod.Split('-');
+        int year = int.Parse(parts[0]);
+        int month = int.Parse(parts[1]);
+
+        isBusy = true;
+
+        try
+        {
+            var deductions = otherDeductions.ToString(CultureInfo.InvariantCulture);
+            var url = $"api/payroll/{selectedEmployeeId}?month={month}&year={year}&otherDeductions={deductions}";
+
+            var response = await Http.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                payslip = await response.Content.ReadFromJsonAsync<PayslipPreview>();
+
+                var employee = employees!.First(e => e.Id == selectedEmployeeId);
+                var periodLabel = periods.First(p => p.Value == selectedPeriod).Label;
+                payslipTitle = $"{employee.FirstName} {employee.LastName}, {periodLabel}";
+            }
+            else if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                errorMessage = "That employee was not found.";
+            }
+            else if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                // Our calculator sends a plain-text reason, e.g. "Employee Date of Birth is required...".
+                var body = await response.Content.ReadAsStringAsync();
+                errorMessage = body.TrimStart().StartsWith("{")
+                    ? "Please check the details entered."
+                    : body;
+            }
+            else
+            {
+                errorMessage = $"Something went wrong ({(int)response.StatusCode}). Please try again.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "Could not reach the payroll API. Is it running?";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}
