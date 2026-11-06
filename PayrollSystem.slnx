@@ -3,4 +3,5 @@
   <Project Path="Payroll.ConsoleApp/Payroll.ConsoleApp.csproj" />
   <Project Path="Payroll.Core/Payroll.Core.csproj" />
   <Project Path="Payroll.Tests/Payroll.Tests.csproj" />
+  <Project Path="Payroll.Web/Payroll.Web.csproj" />
 </Solution>
