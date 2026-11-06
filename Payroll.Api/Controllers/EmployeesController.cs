@@ -14,7 +14,7 @@ public class EmployeesController : ControllerBase
         _db = db;
     }
 
-    
+
     [HttpGet]
     public ActionResult<List<Employee>> GetAll()
     {
@@ -37,15 +37,7 @@ public class EmployeesController : ControllerBase
     [HttpPost]
     public ActionResult<Employee> Create(Employee employee)
     {
-        if (_db.GetEmployeeById(employee.Id) != null)
-        {
-            return Conflict($"An employee with Id {employee.Id} already exists.");
-        }
-
-        if (!_db.AddEmployee(employee))
-        {
-            return StatusCode(500, "The employee could not be saved.");
-        }
+        employee.Id = _db.AddEmployee(employee);
 
         return CreatedAtAction(nameof(GetById), new { id = employee.Id }, employee);
     }

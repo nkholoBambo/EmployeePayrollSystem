@@ -12,7 +12,7 @@ public class PayrollControllerTests
     public PayrollControllerTests()
     {
         _controller = new PayrollController(_repo);
-        _repo.AddEmployee(new Employee
+        _repo.Seed(new Employee
         {
             Id = 1,
             FirstName = "Test",

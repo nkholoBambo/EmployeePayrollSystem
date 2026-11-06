@@ -13,12 +13,18 @@ public class FakeEmployeeRepository : IEmployeeRepository
     public Employee? GetEmployeeById(int id) =>
         _employees.TryGetValue(id, out var employee) ? employee : null;
 
-    public bool AddEmployee(Employee employee)
+    private int _nextId = 1;
+
+    public int AddEmployee(Employee employee)
     {
-        if (FailOnAdd) return false;
-        _employees[employee.Id] = employee;
-        return true;
+        var id = _nextId++;
+        employee.Id = id;
+        _employees[id] = employee;
+        return id;
     }
+
+    
+    public void Seed(Employee employee) => _employees[employee.Id] = employee;
 
     public bool UpdateEmployee(Employee employee)
     {

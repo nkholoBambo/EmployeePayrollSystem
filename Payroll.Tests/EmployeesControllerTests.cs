@@ -33,8 +33,8 @@ public class EmployeesControllerTests
     [Fact]
     public void GetAll_ReturnsOk_WithAllEmployees()
     {
-        _repo.AddEmployee(MakeEmployee(1));
-        _repo.AddEmployee(MakeEmployee(2));
+        _repo.Seed(MakeEmployee(1));
+        _repo.Seed(MakeEmployee(2));
 
         var result = _controller.GetAll();
 
@@ -47,7 +47,7 @@ public class EmployeesControllerTests
     public void GetById_Existing_ReturnsOk()
     {
         var employee = MakeEmployee(1);
-        _repo.AddEmployee(employee);
+        _repo.Seed(employee);
 
         var result = _controller.GetById(1);
 
@@ -66,36 +66,31 @@ public class EmployeesControllerTests
     // ---------- POST ----------
 
     [Fact]
-    public void Create_NewEmployee_Returns201_PointingAtGetById()
+    public void Create_NewEmployee_Returns201_WithTheDatabaseGeneratedId()
     {
-        var result = _controller.Create(MakeEmployee(10));
+        var result = _controller.Create(MakeEmployee(0));
 
         var created = Assert.IsType<CreatedAtActionResult>(result.Result);
         Assert.Equal(nameof(EmployeesController.GetById), created.ActionName);
-        Assert.Equal(10, created.RouteValues!["id"]);
-        Assert.NotNull(_repo.GetEmployeeById(10));   // it was really saved
+
+        var saved = Assert.IsType<Employee>(created.Value);
+        Assert.True(saved.Id > 0);
+        Assert.Equal(saved.Id, created.RouteValues!["id"]);
+        Assert.NotNull(_repo.GetEmployeeById(saved.Id));
     }
+
+    
 
     [Fact]
-    public void Create_DuplicateId_ReturnsConflict()
-    {
-        _repo.AddEmployee(MakeEmployee(10));
+public void Create_IgnoresAnIdSentByTheCaller()
+{
+    var result = _controller.Create(MakeEmployee(999));
 
-        var result = _controller.Create(MakeEmployee(10));
-
-        Assert.IsType<ConflictObjectResult>(result.Result);
-    }
-
-    [Fact]
-    public void Create_WhenSaveFails_Returns500()
-    {
-        _repo.FailOnAdd = true;
-
-        var result = _controller.Create(MakeEmployee(10));
-
-        var error = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(500, error.StatusCode);
-    }
+    var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+    var saved = Assert.IsType<Employee>(created.Value);
+    Assert.NotEqual(999, saved.Id);
+    Assert.Null(_repo.GetEmployeeById(999));
+}
 
     // ---------- PUT ----------
 
@@ -118,7 +113,7 @@ public class EmployeesControllerTests
     [Fact]
     public void Update_ExistingEmployee_ReturnsNoContent_AndChangesData()
     {
-        _repo.AddEmployee(MakeEmployee(5));
+        _repo.Seed(MakeEmployee(5));
         var changed = MakeEmployee(5);
         changed.Salary = 45000m;
 
@@ -131,7 +126,7 @@ public class EmployeesControllerTests
     [Fact]
     public void Update_WhenSaveFails_Returns500()
     {
-        _repo.AddEmployee(MakeEmployee(5));
+        _repo.Seed(MakeEmployee(5));
         _repo.FailOnUpdate = true;
 
         var result = _controller.Update(5, MakeEmployee(5));
@@ -153,7 +148,7 @@ public class EmployeesControllerTests
     [Fact]
     public void Delete_ExistingEmployee_ReturnsNoContent_AndRemovesIt()
     {
-        _repo.AddEmployee(MakeEmployee(5));
+        _repo.Seed(MakeEmployee(5));
 
         var result = _controller.Delete(5);
 
@@ -164,7 +159,7 @@ public class EmployeesControllerTests
     [Fact]
     public void Delete_WhenDeleteFails_Returns500()
     {
-        _repo.AddEmployee(MakeEmployee(5));
+        _repo.Seed(MakeEmployee(5));
         _repo.FailOnDelete = true;
 
         var result = _controller.Delete(5);

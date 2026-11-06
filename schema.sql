@@ -54,3 +54,4 @@ REFERENCES [dbo].[Employees] ([Id])
 GO
 ALTER TABLE [dbo].[PayrollRecords] CHECK CONSTRAINT [FK_PayrollRecords_Employees]
 GO
+[Id] [int] IDENTITY(1,1) NOT NULL,

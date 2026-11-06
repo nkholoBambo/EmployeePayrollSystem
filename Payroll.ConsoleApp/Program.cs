@@ -86,27 +86,6 @@ static void FindEmployeesBySalary(List<Employee> employees)
 
 static void AddEmployee(List<Employee> employees, DatabaseHelper dbHelper)
 {
-    //Getting new enployee Id
-    int newId;
-    while (true)
-    {
-        Console.Write("Enter employee ID: ");
-        string? idInput = Console.ReadLine();
-
-        if (!int.TryParse(idInput, out newId))
-        {
-            Console.WriteLine("Invalid input. Please enter a valid employee ID.");
-            continue;
-        }
-
-        if (employees.Any(e => e.Id == newId))
-        {
-            Console.WriteLine("Employee ID already exists. Please enter a unique employee ID.");
-            continue;
-        }
-
-        break;
-    }
 
 
     //employee first name
@@ -187,7 +166,7 @@ static void AddEmployee(List<Employee> employees, DatabaseHelper dbHelper)
         Console.Write("Enter salary: ");
         string? salaryInput = Console.ReadLine();
 
-        if (!decimal.TryParse(salaryInput, out salary) || salary < 0)
+        if (!decimal.TryParse(salaryInput, out salary) || salary <= 0)
         {
             Console.WriteLine("Invalid input. Please enter a valid salary.");
             continue;
@@ -213,31 +192,41 @@ static void AddEmployee(List<Employee> employees, DatabaseHelper dbHelper)
         break;
     }
 
+    //employee date of birth
+    DateTime dateOfBirth;
+    while (true)
+    {
+        Console.Write("Enter date of birth (yyyy-MM-dd): ");
+        string? dobInput = Console.ReadLine();
+
+        if (!DateTime.TryParseExact(dobInput, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out dateOfBirth)
+            || dateOfBirth > DateTime.Today
+            || dateOfBirth.Year < 1900)
+        {
+            Console.WriteLine("Invalid input. Please enter a valid date of birth in the format yyyy-MM-dd.");
+            continue;
+        }
+
+        break;
+    }
 
     Employee newEmployee = new Employee
     {
-        Id = newId,
         FirstName = firstName,
         LastName = lastName,
         Email = email,
         Department = selectedDepartment,
         Position = position,
         Salary = salary,
-        HireDate = hireDate
+        HireDate = hireDate,
+        DateOfBirth = dateOfBirth
     };
 
     try
     {
-        bool success = dbHelper.AddEmployee(newEmployee);
-        if (success)
-        {
-            employees.Add(newEmployee);
-            Console.WriteLine("Employee added successfully!");
-        }
-        else
-        {
-            Console.WriteLine("Failed to add employee to the database.");
-        }
+        newEmployee.Id = dbHelper.AddEmployee(newEmployee);
+        employees.Add(newEmployee);
+        Console.WriteLine($"Employee added successfully with Id {newEmployee.Id}.");
     }
     catch (SqlException ex)
     {

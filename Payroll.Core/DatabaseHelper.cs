@@ -131,17 +131,17 @@ public class DatabaseHelper : IEmployeeRepository, IPayrollRepository
         return null;
     }
 
-    public bool AddEmployee(Employee employee)
+    public int AddEmployee(Employee employee)
     {
         using var connection = new SqlConnection(_connectionString);
         connection.Open();
 
         using var command = new SqlCommand(
-            "INSERT INTO Employees (Id, FirstName, LastName, Email, Department, Position, Salary, HireDate, DateOfBirth) " +
-            "VALUES (@Id, @FirstName, @LastName, @Email, @Department, @Position, @Salary, @HireDate, @DateOfBirth)",
+            "INSERT INTO Employees (FirstName, LastName, Email, Department, Position, Salary, HireDate, DateOfBirth) " +
+            "OUTPUT INSERTED.Id " +
+            "VALUES (@FirstName, @LastName, @Email, @Department, @Position, @Salary, @HireDate, @DateOfBirth)",
             connection);
 
-        command.Parameters.AddWithValue("@Id", employee.Id);
         command.Parameters.AddWithValue("@FirstName", employee.FirstName);
         command.Parameters.AddWithValue("@LastName", employee.LastName);
         command.Parameters.AddWithValue("@Email", employee.Email);
@@ -154,10 +154,9 @@ public class DatabaseHelper : IEmployeeRepository, IPayrollRepository
             Value = employee.Salary
         });
         command.Parameters.AddWithValue("@HireDate", employee.HireDate);
-        command.Parameters.AddWithValue("@DateOfBirth", employee.DateOfBirth ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@DateOfBirth", (object?)employee.DateOfBirth ?? DBNull.Value);
 
-        int rowsAffected = command.ExecuteNonQuery();
-        return rowsAffected > 0;
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 
     public bool UpdateEmployee(Employee employee)
