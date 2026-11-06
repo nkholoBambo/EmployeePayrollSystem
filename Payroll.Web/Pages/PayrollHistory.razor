@@ -1,0 +1,105 @@
+@page "/history"
+@using System.Globalization
+@using Payroll.Web.Models
+@inject HttpClient Http
+
+<PageTitle>Payroll history</PageTitle>
+
+<h1>Payroll history</h1>
+
+@if (loadError is not null)
+{
+    <div class="alert alert-danger">@loadError</div>
+}
+else if (records is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (records.Count == 0)
+{
+    <p>No payslips have been saved yet.</p>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Employee</label>
+            <select class="form-select" @bind="filterEmployeeId">
+                <option value="0">All employees</option>
+                @foreach (var employee in employees)
+                {
+                    <option value="@employee.Id">@employee.FirstName @employee.LastName</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <p class="text-muted">Showing @VisibleRecords.Count() of @records.Count payslips.</p>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Period</th>
+                    <th class="text-end">Gross</th>
+                    <th class="text-end">PAYE</th>
+                    <th class="text-end">UIF</th>
+                    <th class="text-end">Other</th>
+                    <th class="text-end">Net pay</th>
+                    <th>Processed</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in VisibleRecords)
+                {
+                    <tr>
+                        <td>@NameFor(record.EmployeeId)</td>
+                        <td>@PeriodLabel(record)</td>
+                        <td class="text-end">R @record.GrossPay.ToString("N2")</td>
+                        <td class="text-end">R @record.PAYE.ToString("N2")</td>
+                        <td class="text-end">R @record.UIF.ToString("N2")</td>
+                        <td class="text-end">R @record.OtherDeductions.ToString("N2")</td>
+                        <td class="text-end fw-bold">R @record.NetPay.ToString("N2")</td>
+                        <td>@record.ProcessedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<PayrollRecord>? records;
+    private List<Employee> employees = new();
+    private Dictionary<int, string> employeeNames = new();
+    private string? loadError;
+    private int filterEmployeeId;
+
+    private IEnumerable<PayrollRecord> VisibleRecords =>
+        filterEmployeeId == 0
+            ? records!
+            : records!.Where(r => r.EmployeeId == filterEmployeeId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            employees = await Http.GetFromJsonAsync<List<Employee>>("api/employees") ?? new();
+            employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+
+            records = await Http.GetFromJsonAsync<List<PayrollRecord>>("api/payroll/records") ?? new();
+        }
+        catch (HttpRequestException)
+        {
+            loadError = "Could not reach the payroll API. Is it running?";
+        }
+    }
+
+    private string NameFor(int employeeId) =>
+        employeeNames.TryGetValue(employeeId, out var name) ? name : $"Employee #{employeeId}";
+
+    private static string PeriodLabel(PayrollRecord record) =>
+        new DateTime(record.PayYear, record.PayMonth, 1)
+            .ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+}
